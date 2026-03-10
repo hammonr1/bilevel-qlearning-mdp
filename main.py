@@ -3,6 +3,9 @@ import numpy as np
 from config import gamma, epsilon_outer, epsilon_inner
 from agent import run_one_episode, train_bilevel_qlearning
 
+import os
+import matplotlib.pyplot as plt
+
 # ============================================================================
 # GREEDY EVALUATION (epsilon = 0)
 # ============================================================================
@@ -75,4 +78,37 @@ if __name__ == "__main__":
     for (s_key, action), q_val in top_attacks:
         print(f"  state={s_key[0]}  attack={action}  Q={q_val:.4f}")
         
+        
+    # PLOTS
+    # Create outputs folder if it doesn't exist
+    os.makedirs("outputs", exist_ok=True)
+
+    # --- Plot 1: Raw damage per episode ---
+    plt.figure(figsize=(10, 4))
+    plt.plot(damage_history, alpha=0.4, color='steelblue', label='Episode damage')
+    plt.xlabel('Episode')
+    plt.ylabel('Damage')
+    plt.title('Attacker Damage per Episode')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("outputs/damage_per_episode.png")
+    plt.close()
+
+    # --- Plot 2: Rolling average ---
+    window = 50
+    rolling_avg = [
+        sum(damage_history[max(0, i-window):i+1]) / len(damage_history[max(0, i-window):i+1])
+        for i in range(len(damage_history))
+    ]
+    plt.figure(figsize=(10, 4))
+    plt.plot(rolling_avg, color='steelblue', label=f'{window}-episode rolling avg')
+    plt.xlabel('Episode')
+    plt.ylabel('Avg Damage')
+    plt.title('Convergence — Rolling Average Attacker Damage')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("outputs/convergence.png")
+    plt.close()
+
+    print("\nPlots saved to outputs/")
         
