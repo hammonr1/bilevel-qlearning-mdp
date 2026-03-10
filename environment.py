@@ -5,30 +5,6 @@ from config import (
     PRESET_ATTACK_STRATEGIES, PRESET_DEFENSE_STRATEGIES
 )
 
-PRESET_ATTACK_STRATEGIES = [
-    (0, 0),  # No attack
-    (2, 0),  # 2 AMs on asset 0, 0 AMs on asset 1
-    (5, 0),  # 5 AMs on asset 0, 0 AMs on asset 1
-    (0, 2),  # 0 AMs on asset 0, 2 AMs on asset 1
-    (2, 2),  # 2 AMs on asset 0, 2 AMs on asset 1
-    (5, 2),  # 5 AMs on asset 0, 2 AMs on asset 1
-    (0, 5),  # 0 AMs on asset 0, 5 AMs on asset 1
-    (2, 5),  # 2 AMs on asset 0, 5 AMs on asset 1
-    (5, 5),  # 5 AMs on asset 0, 5 AMs on asset 1
-]
-
-PRESET_DEFENSE_STRATEGIES = [
-    (0, 0),  # No defense
-    (1, 0),  # 1 IM on asset 0, 0 IMs on asset 1
-    (3, 0),  # 3 IMs on asset 0, 0 IMs on asset 1
-    (0, 1),  # 0 IMs on asset 0, 1 IM on asset 1
-    (1, 1),  # 1 IM on asset 0, 1 IM on asset 1
-    (3, 1),  # 3 IMs on asset 0, 1 IM on asset 1
-    (0, 3),  # 0 IMs on asset 0, 3 IMs on asset 1
-    (1, 3),  # 1 IM on asset 0, 3 IMs on asset 1
-    (3, 3),  # 3 IMs on asset 0, 3 IMs on asset 1
-]
-
 def generate_attack_strategies(state, TAM_this_stage):
     """
     Helper for STEP 1: Generate feasible attack strategies
