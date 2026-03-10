@@ -110,3 +110,18 @@ def state_to_key(state:dict):
     inventory = tuple(state['IM_inventory'][n] for n in sorted(state['IM_inventory']))
     return (status, inventory)
 
+def calculate_saving_probability(num_AMs, num_IMs, p, p_tilde, epsilon: float = 1e-6):
+    """
+    Helper for STEP 5: Calculate probability asset survives
+
+    From notes: Uses formula involving (1-P(Loss|s))^(z_i)
+    From paper: P_save ≈ (1 - (1-p_d)^(num_IMs/num_AMs) * p_s)^num_AMs
+    """
+    if num_AMs == 0:
+        return 1.0
+    if num_IMs == 0:
+        return (1.0 - p) ** num_AMs
+
+    ratio   = num_IMs / (num_AMs + epsilon)
+    p_save  = (1.0 - p * (1.0 - p_tilde) ** ratio) ** num_AMs
+    return max(0.0, min(1.0, p_save))   # clamp to [0, 1]
