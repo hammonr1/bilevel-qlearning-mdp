@@ -21,7 +21,9 @@ import random
 from config import (
     TAM, TIM, num_stages, num_assets, asset_value,
     SAM_positions, coverage_matrix,
-    initial_asset_status, initial_IM_inventory
+    initial_asset_status, initial_IM_inventory,
+    gamma, epsilon_outer, epsilon_inner,
+    P_AM_HIT, P_IM_KILL        
 )
 from environment import (
     generate_attack_strategies, generate_defend_strategies,
