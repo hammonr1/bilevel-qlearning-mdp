@@ -287,3 +287,57 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
 
     return episode_damage
 
+# ============================================================================
+# COMPLETE TRAINING LOOP
+# ============================================================================
+
+def train_bilevel_qlearning(num_episodes, verbose_every: int = 100):
+    """
+    Train the bi-level Q-learning system.
+    Each episode runs through all stages; each stage executes all 9 steps.
+
+    Q-tables and visit counts are initialized here (not globally) so there
+    is exactly one set of tables in use at a time.
+    """
+
+    print("="*70)
+    print("BI-LEVEL Q-LEARNING TRAINING")
+    print("="*70)
+
+    # Q-tables and visit counts — initialized here, passed into run_one_episode
+    Q_outer = {}   # Q_outer[(state_key, attack_action)]  = expected attacker reward
+    Q_inner = {}   # Q_inner[(inner_state_key, defend_action)] = expected defender reward
+    N_outer = {}   # Visit counts for outer-level learning rate
+    N_inner = {}   # Visit counts for inner-level learning rate
+
+    damage_history = []
+
+    for episode in range(1, num_episodes + 1):
+
+        verbose = (episode == 1 or episode % verbose_every == 0)
+        if verbose:
+            print(f"\n{'#'*70}")
+            print(f"EPISODE {episode} / {num_episodes}")
+            print(f"{'#'*70}")
+
+        # Run one complete episode through all stages (executes all 9 steps per stage)
+        ep_damage = run_one_episode(
+            Q_outer, Q_inner, N_outer, N_inner,
+            gamma, epsilon_outer, epsilon_inner,
+            verbose=verbose
+        )
+        damage_history.append(ep_damage)
+
+        # Optional: Track and report convergence metrics
+        # TODO: Check if Q-values are converging
+        # TODO: Optionally decay epsilon over time
+        if verbose:
+            avg = sum(damage_history[-50:]) / len(damage_history[-50:])
+            print(f"\n  → Episode damage: {ep_damage:.1f}  |  "
+                  f"Last-50 avg: {avg:.2f}")
+
+    print("\n" + "="*70)
+    print("TRAINING COMPLETE")
+    print("="*70)
+
+    return Q_outer, Q_inner, damage_history
