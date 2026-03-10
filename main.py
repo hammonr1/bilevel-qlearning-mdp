@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from config import gamma, epsilon_outer, epsilon_inner
-from agent import run_one_episode
+from agent import run_one_episode, train_bilevel_qlearning
 
 # ============================================================================
 # GREEDY EVALUATION (epsilon = 0)
