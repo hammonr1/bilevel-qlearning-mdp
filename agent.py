@@ -18,13 +18,11 @@ THE 9 STEPS (executed each stage):
 """
 
 import random
-from config import (
-    TAM, TIM, num_stages, num_assets, asset_value,
-    SAM_positions, coverage_matrix,
-    initial_asset_status, initial_IM_inventory,
-    gamma, epsilon_outer, epsilon_inner,
-    P_AM_HIT, P_IM_KILL        
-)
+from config import (TAM, TIM, num_stages, num_assets, asset_value,
+    SAM_positions, coverage_matrix, initial_asset_status,
+    initial_IM_inventory, gamma, epsilon_outer, epsilon_inner,
+    P_AM_HIT, P_IM_KILL, ASSET_NODE)
+
 from environment import (
     generate_attack_strategies, generate_defend_strategies,
     calculate_saving_probability, state_to_key, epsilon_greedy
@@ -108,8 +106,14 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         # --------------------------------------------------------------------
 
         # Generate all feasible defend actions given attack_action
-        feasible_defends = generate_defend_strategies(current_state, TIM_this_stage, attack_action)
-
+        feasible_defends = generate_defend_strategies(
+                                inner_state      = current_state['asset_status'],
+                                TIM_this_stage   = TIM_this_stage,
+                                attack_action    = attack_action,
+                                IM_inventory     = current_state['IM_inventory'],
+                                coverage_matrix  = coverage_matrix,
+                                ASSET_NODE       = ASSET_NODE
+                            )
         # Select defend action using epsilon-greedy on Q_inner
         for d in feasible_defends:
             if (inner_state_key, d) not in Q_inner:

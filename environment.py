@@ -37,11 +37,10 @@ def generate_attack_strategies(state, TAM_this_stage):
 
     return feasible_strategies
 
-
-def generate_defend_strategies(inner_state, TIM_this_stage, attack_action):
+def generate_defend_strategies(inner_state, TIM_this_stage, attack_action, 
+                                IM_inventory, coverage_matrix, ASSET_NODE):
     """
     Helper for STEP 3: Generate feasible defend strategies
-
     Returns: List of defend actions
     Each defend action is a distribution of TIM_this_stage across threatened assets
     """
@@ -55,31 +54,58 @@ def generate_defend_strategies(inner_state, TIM_this_stage, attack_action):
     if not threatened_indices:
         return [tuple([0] * n_assets)]
 
+    # Pre-compute reachable supply per asset given current inventory and coverage.
+    # Derived from Model (5-10) constraints (6) and (7):
+    #   Constraint (6): v[n,m] <= M * beta[n,m]  — IMs can only flow along covered edges
+    #   Constraint (7): sum_m v[n,m] <= x_n^t    — supply limited by node inventory
+    # Together these bound the max deliverable IMs to asset j as:
+    #   reachable[j] = sum_{i: beta[i][j]=1} x_i^t
+    node_indices = list(IM_inventory.keys())
+    reachable = {}
+    for j in range(n_assets):
+        reachable[j] = sum(
+            IM_inventory[i] for i in node_indices
+            if coverage_matrix.get(i, {}).get(ASSET_NODE[j], 0) == 1
+        )
+
     for defense_strategy in PRESET_DEFENSE_STRATEGIES:
         is_valid = True
         total_IMs = 0
 
         for i in range(n_assets):
-            # Check various validity conditions:
-
-            # 1. Can only defend assets that are being attacked
+            # VALIDITY CHECK 1: Can only defend assets that are being attacked.
+            # From inner MDP feasibility condition: z_n^t = 0 if y_n^t = 0
+            # (Section 3.1.2: "IMs can only be assigned to assets threatened by AMs")
             if defense_strategy[i] > 0 and attack_action[i] == 0:
                 is_valid = False
                 break
 
-            # 2. Optional: Don't over-defend (defense <= attack)
-            # Comment this out if your model allows over-defense
+            # VALIDITY CHECK 2: Don't over-defend (defense <= attack).
+            # From Proposition 2: when p̃ = 1, number of IMs should be <= number of AMs.
+            # We apply this as a general upper bound to avoid wasteful allocations.
             if defense_strategy[i] > attack_action[i]:
+                is_valid = False
+                break
+
+            # VALIDITY CHECK 3: IMs requested cannot exceed physically reachable supply.
+            # This is a precondition for Model (5-10) constraint (8) to be feasible:
+            #   Constraint (8): sum_i v[i,j] >= z_j
+            # If reachable[j] < z_j, constraint (8) can never be satisfied and the LP
+            # will be infeasible. We filter these strategies out here rather than
+            # letting the LP discover the contradiction after the fact.
+            if defense_strategy[i] > reachable[i]:
                 is_valid = False
                 break
 
             total_IMs += defense_strategy[i]
 
-        # 3. Check if total IMs used doesn't exceed TIM available
+        # VALIDITY CHECK 4: Total IMs used cannot exceed budget for this stage.
+        # From problem description: N_D = (alpha * B) / |T|
+        # The defender distributes at most N_D IMs per salvo across all assets.
         if is_valid and total_IMs <= TIM_this_stage:
             feasible_strategies.append(defense_strategy)
 
-    # If no feasible strategies, at least return "no defense"
+    # If no feasible strategies remain, fall back to "no defense"
     if not feasible_strategies:
         feasible_strategies.append(tuple([0] * n_assets))
 
