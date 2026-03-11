@@ -102,6 +102,23 @@ def solve_IM_allocation_model(current_state, attack_action, defend_action,
         print(f"\nOptimization Status: {LpStatus[problem.status]}")
         print(f"Objective Value: {problem.objective.value()}")
 
+    # status = LpStatus[problem.status]
+    # if status != 'Optimal':
+    #     print(f"\n⚠️  INFEASIBLE LP DETECTED")
+    #     print(f"   attack_action: {attack_action}")
+    #     print(f"   defend_action: {defend_action}")
+    #     print(f"   asset_status:  {current_state['asset_status']}")
+    #     print(f"   IM_inventory:  {current_state['IM_inventory']}")
+    #     print(f"   z (IMs requested per asset): {z}")
+    #     print(f"   y (AMs per asset):           {y}")
+    #     print(f"   Supply available: { {i: x_current[i] for i in node_indices} }")
+    #     print(f"   Demand required:  { {j: z[j] for j in asset_indices} }")
+    #     # Check if demand can physically be met given coverage
+    #     for j in asset_indices:
+    #         reachable = sum(x_current[i] for i in node_indices 
+    #                     if coverage_matrix.get(i, {}).get(j, 0) == 1)
+    #         print(f"   Asset {j}: needs {z[j]} IMs, reachable supply = {reachable}")
+        
     ## EXTRACT RESULTS
     allocation = {}
     for i in node_indices:
