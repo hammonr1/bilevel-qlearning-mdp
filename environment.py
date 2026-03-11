@@ -1,9 +1,9 @@
 import random
-from config import (
-    num_assets, asset_value,
-    P_AM_HIT, P_IM_KILL,
-    PRESET_ATTACK_STRATEGIES, PRESET_DEFENSE_STRATEGIES
-)
+from config import (TAM, TIM, num_stages, num_assets, asset_value,
+                    SAM_positions, coverage_matrix, initial_asset_status,
+                    initial_IM_inventory, gamma, epsilon_outer, epsilon_inner,
+                    P_AM_HIT, P_IM_KILL, ASSET_NODE,
+                    PRESET_ATTACK_STRATEGIES, PRESET_DEFENSE_STRATEGIES)
 
 def generate_attack_strategies(state, TAM_this_stage):
     """
@@ -67,6 +67,11 @@ def generate_defend_strategies(inner_state, TIM_this_stage, attack_action,
             IM_inventory[i] for i in node_indices
             if coverage_matrix.get(i, {}).get(ASSET_NODE[j], 0) == 1
         )
+
+    print(f"DEBUG reachable: {reachable}")
+    print(f"DEBUG IM_inventory: {IM_inventory}")
+    print(f"DEBUG attack_action: {attack_action}")
+    print(f"DEBUG TIM_this_stage: {TIM_this_stage}")
 
     for defense_strategy in PRESET_DEFENSE_STRATEGIES:
         is_valid = True
