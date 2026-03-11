@@ -60,6 +60,14 @@ def solve_IM_allocation_model(current_state, attack_action, defend_action,
     v = LpVariable.dicts("v", indices, lowBound=0, cat='Continuous')
     x = LpVariable.dicts("x", node_indices, lowBound=0, cat='Continuous')
 
+    prob_save = {}
+    for m in asset_indices:
+        if y[m] > 0:
+            ratio = z[m] / (y[m] + epsilon)
+            prob_save[m] = (1 - p * (1 - p_tilde)**ratio)**y[m]
+        else:
+            prob_save[m] = 1.0
+        
     ## Survival probability for each SAM node m (based on what's being defended at that node)
     # Nodes not under attack survive with probability 1
     # Needed because prob_save is keyed by asset index, but objective needs node keys
@@ -74,7 +82,6 @@ def solve_IM_allocation_model(current_state, attack_action, defend_action,
     # Objective: maximize expected future coverage using REMAINING IMs after allocation
     # From Model (5): max sum_n sum_m x[m] * prob_save[m] * prob_save[n] * beta[m][n] * theta[n]
     # x[m] = remaining IMs at node m after this stage (defined in constraint 4)
-    # This naturally discourages over-allocation — sending more IMs reduces x[m]
     problem += lpSum(
         x[m] * prob_save_node[m] * prob_save[j] *
         coverage_matrix.get(m, {}).get(ASSET_NODE[j], 0) * s[j]
