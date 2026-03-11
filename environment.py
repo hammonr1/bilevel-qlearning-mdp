@@ -102,12 +102,15 @@ def epsilon_greedy(Q_table, state_key, feasible_actions, epsilon):
             best_action = action
     return best_action
 
-def state_to_key(state:dict):
+def state_to_key(state: dict):
     """
     Convert mutable state dict to a hashable key for Q-tables.
     """
     status = tuple(state['asset_status'])
-    inventory = tuple(state['IM_inventory'][n] for n in sorted(state['IM_inventory']))
+    inventory = tuple(
+        int(round(state['IM_inventory'][n])) 
+        for n in sorted(state['IM_inventory'])
+    )
     return (status, inventory)
 
 def calculate_saving_probability(num_AMs, num_IMs, p, p_tilde, epsilon: float = 1e-6):
