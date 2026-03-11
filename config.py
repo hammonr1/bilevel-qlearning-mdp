@@ -25,11 +25,18 @@ coverage_matrix = {
 }
 
 # Asset parameters
-# The notes identify the 2 important assets as nodes n₃ and n₄ in the 5-node network.
-# In code they are indexed 0 and 1 (i.e., asset 0 = node 3, asset 1 = node 4).
-num_assets    = 2   # 2 important assets (n₃ and n₄ from notes)
-asset_indices = list(range(num_assets))  # [0, 1]
-asset_value   = 8   # Value of each intact asset
+# Maps asset index (0-based) → network node number
+# To add/remove assets, only edit ASSET_NODE
+ASSET_NODE = {
+    0: 3,   # asset 0 lives at node 3
+    1: 4,   # asset 1 lives at node 4
+}
+
+num_assets    = len(ASSET_NODE)           # derived automatically
+asset_indices = list(ASSET_NODE.keys())   # [0, 1]
+asset_value   = 8                         # value of each intact asset
+
+assert num_assets == len(ASSET_NODE), "num_assets must match ASSET_NODE entries"
 
 # Probability parameters (from Colab: P=0.85, P_tilde=0.80)
 P_AM_HIT  = 0.85   # p  — probability AM destroys asset if not intercepted

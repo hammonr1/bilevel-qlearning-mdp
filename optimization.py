@@ -1,5 +1,5 @@
 from pulp import LpProblem, LpMaximize, LpVariable, lpSum, LpStatus, value
-from config import asset_value, coverage_matrix
+from config import asset_value, coverage_matrix, ASSET_NODE
 
 def solve_IM_allocation_model(current_state, attack_action, defend_action,
                                SAM_positions, coverage_matrix,
@@ -74,13 +74,13 @@ def solve_IM_allocation_model(current_state, attack_action, defend_action,
         v[(i, j)] * prob_save[j] * s[j]
         for i in node_indices
         for j in asset_indices
-        if coverage_matrix.get(i, {}).get(j, 0) == 1 and y[j] > 0
+        if coverage_matrix.get(i, {}).get(ASSET_NODE[j], 0) == 1 and y[j] > 0
 )
 
     # 1. Coverage constraints: Can only send IMs to assets within coverage
     for i in node_indices:
         for j in asset_indices:
-            beta_ij = coverage_matrix.get(i, {}).get(j, 0)
+            beta_ij = coverage_matrix.get(i, {}).get(ASSET_NODE[j], 0)
             problem += v[(i, j)] <= M * beta_ij
 
     # 2. Row sum constraints (supply): Total IMs sent from node i cannot exceed inventory
@@ -116,7 +116,7 @@ def solve_IM_allocation_model(current_state, attack_action, defend_action,
     #     # Check if demand can physically be met given coverage
     #     for j in asset_indices:
     #         reachable = sum(x_current[i] for i in node_indices 
-    #                     if coverage_matrix.get(i, {}).get(j, 0) == 1)
+    #                     if coverage_matrix.get(i, {}).get(ASSET_NODE[j], 0) == 1)
     #         print(f"   Asset {j}: needs {z[j]} IMs, reachable supply = {reachable}")
         
     ## EXTRACT RESULTS
