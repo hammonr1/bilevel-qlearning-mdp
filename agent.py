@@ -9,11 +9,12 @@ THE 9 STEPS (executed each stage):
       Step 3: Select a defend strategy
       Step 4: Calculate optimal IM allocation
       Step 5: Calculate reward for defender (expected saved assets)
-      Step 6: Update inner level Q-value
+      Step 5b: Speculatively compute next state (shared by Steps 6, 8, 9)
+      Step 6: Update inner level Q-value (defender anticipates worst-case attacker)
 
     BACK TO OUTER LEVEL:
       Step 7: Use inner level result as outer level reward
-      Step 8: Observe next state (stochastic transition)
+      Step 8: Observe next state (reuse speculative transition from Step 5b)
       Step 9: Update outer level Q-value using Bellman equation
 """
 
@@ -35,8 +36,15 @@ from optimization import solve_IM_allocation_model
 
 def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, epsilon_inner, verbose: bool = True):
     """
-    Execute one complete episode through all stages
-    Each stage goes through all 9 steps
+    Execute one complete episode through all stages.
+    Each stage goes through all 9 steps.
+
+    Key structural fix vs previous version:
+      - Step 5b computes the speculative next state BEFORE Step 6.
+      - Step 6 uses that look-ahead to update Q_inner with worst-case
+        attacker anticipation (defender-optimal Bellman target).
+      - Steps 8 and 9 reuse the same speculative transition so all three
+        updates are consistent with a single stochastic draw.
     """
 
     # Initialize episode
@@ -52,9 +60,9 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
     for stage in range(1, num_stages + 1):
 
         # Calculate resources for this stage
-        stages_left      = num_stages - stage + 1
-        TAM_this_stage   = TAM_remaining / stages_left
-        TIM_this_stage   = TIM_remaining / stages_left
+        stages_left    = num_stages - stage + 1
+        TAM_this_stage = TAM_remaining / stages_left
+        TIM_this_stage = TIM_remaining / stages_left
 
         if verbose:
             print(f"\n{'='*60}")
@@ -90,7 +98,7 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
 
 
         # --------------------------------------------------------------------
-        # STEP 2: IDENTIFY THE REWARD OF THIS ATTACK
+        # STEP 2: IDENTIFY THE REWARD OF THIS ATTACK (resolved after inner level)
         # --------------------------------------------------------------------
 
 
@@ -98,32 +106,30 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         # INNER LEVEL (DEFENDER)
         # ====================================================================
 
-        # Construct inner level state (includes attack information)
+        # Construct inner level state key (includes attack information)
         inner_state_key = (state_key, attack_action)
 
         # --------------------------------------------------------------------
         # STEP 3: SELECT A DEFEND STRATEGY
         # --------------------------------------------------------------------
+        if verbose: print("\nSTEP 3: Select a defend strategy (inner level)")
 
-        # Generate all feasible defend actions given attack_action
         feasible_defends = generate_defend_strategies(
-                                inner_state      = current_state['asset_status'],
-                                TIM_this_stage   = TIM_this_stage,
-                                attack_action    = attack_action,
-                                IM_inventory     = current_state['IM_inventory'],
-                                coverage_matrix  = coverage_matrix,
-                                ASSET_NODE       = ASSET_NODE
-                            )
-        # Select defend action using epsilon-greedy on Q_inner
+            inner_state    = current_state['asset_status'],
+            TIM_this_stage = TIM_this_stage,
+            attack_action  = attack_action,
+            IM_inventory   = current_state['IM_inventory'],
+            coverage_matrix = coverage_matrix,
+            ASSET_NODE     = ASSET_NODE
+        )
+
         for d in feasible_defends:
             if (inner_state_key, d) not in Q_inner:
                 Q_inner[(inner_state_key, d)] = 0.0
             if (inner_state_key, d) not in N_inner:
                 N_inner[(inner_state_key, d)] = 0
 
-        defend_action = epsilon_greedy(Q_inner, inner_state_key,feasible_defends, epsilon_inner)
-
-        # Increment visit count
+        defend_action = epsilon_greedy(Q_inner, inner_state_key, feasible_defends, epsilon_inner)
         N_inner[(inner_state_key, defend_action)] += 1
 
         if verbose:
@@ -135,9 +141,6 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         # STEP 4: CALCULATE OPTIMAL IM ALLOCATION
         # --------------------------------------------------------------------
         if verbose: print("\nSTEP 4: Calculate optimal IM allocation from SAM batteries to assets")
-
-        # Solve optimization model (5-10) to allocate IMs from SAM batteries
-        # This determines w_ij (IMs from SAM at i to defend asset j)
 
         allocation, state_after_alloc, _ = solve_IM_allocation_model(
             current_state,
@@ -154,121 +157,153 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
 
 
         # --------------------------------------------------------------------
-        # STEP 5: CALCULATE THE REWARD FOR DEFENDER
+        # STEP 5: CALCULATE THE REWARD FOR DEFENDER (expected saved assets)
         # --------------------------------------------------------------------
         if verbose: print("\nSTEP 5: Calculate the reward for defender (expected saved assets)")
 
-        # Calculate expected saved assets using the formula from notes:
-
-        reward_inner = 0
+        reward_inner = 0.0
         p_save_per_asset = []
         for i in range(num_assets):
-            if current_state['asset_status'][i] == 1:   # only intact assets
+            if current_state['asset_status'][i] == 1:
                 ams = attack_action[i]
                 ims = defend_action[i]
-
-                # Calculate saving probability
                 p_save = calculate_saving_probability(ams, ims, P_AM_HIT, P_IM_KILL)
                 reward_inner += asset_value * p_save
                 p_save_per_asset.append(p_save)
             else:
                 p_save_per_asset.append(0.0)   # already destroyed
 
-        if verbose: print(f"   Expected saved assets (defender reward): {reward_inner}")
+        if verbose:
+            print(f"   Expected saved assets (defender reward): {reward_inner:.4f}")
+
+
+        # --------------------------------------------------------------------
+        # STEP 5b: SPECULATIVELY COMPUTE NEXT STATE
+        # This single stochastic draw is shared by Steps 6, 8, and 9 so
+        # all three Q-updates are consistent with the same transition outcome.
+        # --------------------------------------------------------------------
+        speculative_asset_status = list(current_state['asset_status'])
+        for i in range(num_assets):
+            if current_state['asset_status'][i] == 1:
+                if random.random() >= p_save_per_asset[i]:   # asset destroyed
+                    speculative_asset_status[i] = 0
+
+        speculative_next_state = {
+            'asset_status': speculative_asset_status,
+            'IM_inventory': state_after_alloc['IM_inventory']
+        }
+        next_state_key = state_to_key(speculative_next_state)
+
+        # Pre-compute next-stage resources (needed in Steps 6 and 9)
+        next_stages_left   = stages_left - 1
+        next_TAM_remaining = TAM_remaining - TAM_this_stage
+        next_TAM_per_stage = next_TAM_remaining / max(next_stages_left, 1)
+
+        # Next feasible attacks (empty list signals terminal stage)
+        if stage < num_stages:
+            next_feasible_attacks = generate_attack_strategies(
+                speculative_asset_status, next_TAM_per_stage
+            )
+        else:
+            next_feasible_attacks = []
 
 
         # --------------------------------------------------------------------
         # STEP 6: UPDATE INNER LEVEL Q-VALUE
+        # Defender is the primary optimizer: Q_inner Bellman target uses
+        # worst-case (min over attacker) best-response (max over defender)
+        # look-ahead so the defender learns to plan against the worst attacker.
         # --------------------------------------------------------------------
         if verbose: print("\nSTEP 6: Update inner level Q-value")
 
-        # Calculate learning rate for inner level
         alpha_inner = 1.0 / N_inner[(inner_state_key, defend_action)]
 
-        # Inner level is single-stage from defender's perspective within
-        # this salvo → no future inner Q to look up; target = reward_inner
+        if stage < num_stages and next_feasible_attacks:
+            next_inner_vals = []
+            for a in next_feasible_attacks:
+                next_inner_key = (next_state_key, a)
+                # Best defender response to this next attack
+                next_feasible_defs = generate_defend_strategies(
+                    inner_state     = speculative_asset_status,
+                    TIM_this_stage  = next_TAM_per_stage,
+                    attack_action   = a,
+                    IM_inventory    = speculative_next_state['IM_inventory'],
+                    coverage_matrix = coverage_matrix,
+                    ASSET_NODE      = ASSET_NODE
+                )
+                best_def_q = max(
+                    Q_inner.get(((next_inner_key, d)), 0.0)
+                    for d in next_feasible_defs
+                )
+                next_inner_vals.append(best_def_q)
 
-        # Q_inner[(inner_state_key, defend_action)] += alpha_inner * (
-        #     reward_inner - Q_inner[(inner_state_key, defend_action)]
-        # )
-        
-        # fixed (defender anticipates worst-case attacker next stage):
-        worst_case_next = min(
-            Q_inner.get(((next_state_key, a), best_def), 0.0)
-            for a in next_feasible_attacks
-        )
+            # Worst-case: attacker picks the move that minimises defender's best Q
+            worst_case_next = min(next_inner_vals)
+        else:
+            worst_case_next = 0.0   # terminal stage
+
         Q_inner[(inner_state_key, defend_action)] += alpha_inner * (
             reward_inner + gamma * worst_case_next
             - Q_inner[(inner_state_key, defend_action)]
         )
 
         if verbose:
-            print(f"   Updated Q_inner[{inner_state_key}, {defend_action}]")
+            print(f"   worst_case_next={worst_case_next:.4f}")
+            print(f"   Updated Q_inner[{inner_state_key}, {defend_action}] = "
+                  f"{Q_inner[(inner_state_key, defend_action)]:.4f}")
+
 
         # ====================================================================
         # BACK TO OUTER LEVEL (ATTACKER) - PART 2
         # ====================================================================
 
         # --------------------------------------------------------------------
-        # STEP 7: USE INNER LEVEL Q-VALUE AS OUTER LEVEL REWARD
+        # STEP 7: USE INNER LEVEL RESULT AS OUTER LEVEL REWARD
+        # Attacker reward = total possible value − expected saved value (= damage)
         # --------------------------------------------------------------------
         if verbose:
             print("\n" + "-"*60)
             print("STEP 7: Use inner level result as outer level reward")
 
-        # attacker should be rewarded for damage caused, not assets saved
         reward_outer = (sum(current_state['asset_status']) * asset_value) - reward_inner
 
-
         if verbose:
-            print(f"\nSTEP 7 — Outer reward (attacker, = damage): {reward_outer:.4f}")
+            print(f"   Outer reward (attacker damage): {reward_outer:.4f}")
 
 
         # --------------------------------------------------------------------
         # STEP 8: OBSERVE NEXT STATE
+        # Reuse the speculative transition drawn in Step 5b (no new random draw).
+        # Count damage from assets that flipped 0 in that draw.
         # --------------------------------------------------------------------
-        if verbose: print("\nSTEP 8: Observe next state (stochastic transition)")
+        if verbose: print("\nSTEP 8: Observe next state (reusing Step 5b transition)")
 
-        new_asset_status = list(current_state['asset_status'])
         for i in range(num_assets):
-            if current_state['asset_status'][i] == 1:
-                ams = attack_action[i]
-                ims = defend_action[i]
-                p_save = calculate_saving_probability(ams, ims, P_AM_HIT, P_IM_KILL)
-                if random.random() >= p_save:        # asset destroyed
-                    new_asset_status[i] = 0
-                    episode_damage += asset_value
+            if current_state['asset_status'][i] == 1 and speculative_asset_status[i] == 0:
+                episode_damage += asset_value
 
-        next_state = {
-            'asset_status': new_asset_status,
-            'IM_inventory': state_after_alloc['IM_inventory']   # from LP
-        }
+        next_state = speculative_next_state   # already computed above
 
         if verbose:
-            print(f"STEP 8 — Next state: assets={next_state['asset_status']}  "
+            print(f"   Next state: assets={next_state['asset_status']}  "
                   f"IMs={next_state['IM_inventory']}")
+
 
         # --------------------------------------------------------------------
         # STEP 9: UPDATE OUTER LEVEL Q-VALUE USING BELLMAN EQUATION
+        # Reuse next_feasible_attacks computed in Step 5b.
         # --------------------------------------------------------------------
         if verbose: print("\nSTEP 9: Update outer level Q-value using Bellman equation")
 
-        # Calculate learning rate for outer level
         alpha_outer = 1.0 / N_outer[(state_key, attack_action)]
 
-        # Find maximum Q-value for next state (Bellman look-ahead)
-        if stage < num_stages:
-            next_state_key = state_to_key(next_state)
-            next_stages_left = stages_left - 1
-            next_TAM_per_stage = (TAM_remaining - TAM_this_stage) / max(next_stages_left, 1)
-            next_feasible_attacks = generate_attack_strategies(next_state['asset_status'], next_TAM_per_stage)
+        if stage < num_stages and next_feasible_attacks:
             max_Q_next_outer = max(
                 Q_outer.get((next_state_key, a), 0.0) for a in next_feasible_attacks
             )
         else:
             max_Q_next_outer = 0.0   # terminal stage
 
-        # Update Q_outer using Bellman equation
         Q_outer[(state_key, attack_action)] += alpha_outer * (
             reward_outer
             + gamma * max_Q_next_outer
@@ -276,8 +311,7 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         )
 
         if verbose:
-            print(f"STEP 9 — Q_outer updated → "
-                  f"{Q_outer[(state_key, attack_action)]:.4f}")
+            print(f"   Q_outer updated → {Q_outer[(state_key, attack_action)]:.4f}")
 
 
         # ====================================================================
@@ -288,10 +322,7 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
             print(f"END OF STAGE {stage}")
             print(f"{'='*60}\n")
 
-        # Update state for next stage
-        current_state = next_state
-
-        # Update remaining resources (from notes: "TAM = TAM - [TIM/stage]")
+        current_state  = next_state
         TAM_remaining -= TAM_this_stage
         TIM_remaining -= TIM_this_stage
 
@@ -302,6 +333,7 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         print(f"Both Q_outer and Q_inner have been updated throughout")
 
     return episode_damage
+
 
 # ============================================================================
 # COMPLETE TRAINING LOOP
@@ -320,8 +352,7 @@ def train_bilevel_qlearning(num_episodes, verbose_every: int = 100):
     print("BI-LEVEL Q-LEARNING TRAINING")
     print("="*70)
 
-    # Q-tables and visit counts — initialized here, passed into run_one_episode
-    Q_outer = {}   # Q_outer[(state_key, attack_action)]  = expected attacker reward
+    Q_outer = {}   # Q_outer[(state_key, attack_action)]      = expected attacker reward
     Q_inner = {}   # Q_inner[(inner_state_key, defend_action)] = expected defender reward
     N_outer = {}   # Visit counts for outer-level learning rate
     N_inner = {}   # Visit counts for inner-level learning rate
@@ -336,7 +367,6 @@ def train_bilevel_qlearning(num_episodes, verbose_every: int = 100):
             print(f"EPISODE {episode} / {num_episodes}")
             print(f"{'#'*70}")
 
-        # Run one complete episode through all stages (executes all 9 steps per stage)
         ep_damage = run_one_episode(
             Q_outer, Q_inner, N_outer, N_inner,
             gamma, epsilon_outer, epsilon_inner,
@@ -344,9 +374,6 @@ def train_bilevel_qlearning(num_episodes, verbose_every: int = 100):
         )
         damage_history.append(ep_damage)
 
-        # Optional: Track and report convergence metrics
-        # TODO: Check if Q-values are converging
-        # TODO: Optionally decay epsilon over time
         if verbose:
             avg = sum(damage_history[-50:]) / len(damage_history[-50:])
             print(f"\n  → Episode damage: {ep_damage:.1f}  |  "
