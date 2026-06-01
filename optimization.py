@@ -84,7 +84,7 @@ def solve_IM_allocation_model(current_state, attack_action, defend_action,
     # x[m] = remaining IMs at node m after this stage (defined in constraint 4)
     problem += lpSum(
         x[m] * prob_save_node[m] * prob_save[j] *
-        coverage_matrix.get(m, {}).get(ASSET_NODE[j], 0) * s[j]
+        coverage_matrix.get(m, {}).get(ASSET_NODE[j], 0) *  asset_value * s[j]
         for m in node_indices
         for j in asset_indices
     )

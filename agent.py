@@ -188,8 +188,18 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         # Inner level is single-stage from defender's perspective within
         # this salvo → no future inner Q to look up; target = reward_inner
 
+        # Q_inner[(inner_state_key, defend_action)] += alpha_inner * (
+        #     reward_inner - Q_inner[(inner_state_key, defend_action)]
+        # )
+        
+        # fixed (defender anticipates worst-case attacker next stage):
+        worst_case_next = min(
+            Q_inner.get(((next_state_key, a), best_def), 0.0)
+            for a in next_feasible_attacks
+        )
         Q_inner[(inner_state_key, defend_action)] += alpha_inner * (
-            reward_inner - Q_inner[(inner_state_key, defend_action)]
+            reward_inner + gamma * worst_case_next
+            - Q_inner[(inner_state_key, defend_action)]
         )
 
         if verbose:
