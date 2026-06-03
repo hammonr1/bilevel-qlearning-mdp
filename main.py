@@ -121,9 +121,53 @@ if __name__ == "__main__":
                 writer.writerow(["defender", t, status, inventory, attack, defense, f"{q:.4f}"])
 
     print("\nPer-stage Q-matrices saved to outputs/q_matrices_by_stage.csv")
-    
+
     # ==========================================================================
-    # DIAGNOSTICS: Reconstruct epsilon decay
+    # OPTIMAL POLICIES  (argmax_a Q(s,a) for each state)
+    # ==========================================================================
+
+    # Attacker: for each (stage, status, inventory) pick the attack with highest Q
+    best_attack_per_state = {}
+    for (state_key, action), q in Q_outer.items():
+        if state_key not in best_attack_per_state or q > best_attack_per_state[state_key][1]:
+            best_attack_per_state[state_key] = (action, q)
+
+    with open("outputs/optimal_attacker_policy.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["stage", "asset_status", "im_inventory", "best_attack", "q_value"])
+        for state_key, (best_attack, q) in sorted(best_attack_per_state.items()):
+            stage_num, status, inventory = state_key
+            writer.writerow([stage_num, status, inventory, best_attack, f"{q:.4f}"])
+    print("Optimal attacker policy saved to outputs/optimal_attacker_policy.csv")
+
+    # Defender: for each (stage, status, inventory, attack) pick the defense with highest Q
+    best_defense_per_state = {}
+    for (inner_state_key, action), q in Q_inner.items():
+        if inner_state_key not in best_defense_per_state or q > best_defense_per_state[inner_state_key][1]:
+            best_defense_per_state[inner_state_key] = (action, q)
+
+    with open("outputs/optimal_defender_policy.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["stage", "asset_status", "im_inventory", "attack", "best_defense", "q_value"])
+        for inner_state_key, (best_defense, q) in sorted(best_defense_per_state.items()):
+            state_key, attack = inner_state_key
+            stage_num, status, inventory = state_key
+            writer.writerow([stage_num, status, inventory, attack, best_defense, f"{q:.4f}"])
+    print("Optimal defender policy saved to outputs/optimal_defender_policy.csv")
+
+    # Console summary
+    print("\n" + "="*70)
+    print("OPTIMAL POLICIES SUMMARY")
+    print("="*70)
+    print("\nAttacker — best attack per (stage, state):")
+    for state_key, (best_attack, q) in sorted(best_attack_per_state.items()):
+        stage_num, status, inventory = state_key
+        print(f"  stage={stage_num}  status={status}  best_attack={best_attack}  Q={q:.4f}")
+    print("\nDefender — best defense per (stage, state, attack):")
+    for inner_state_key, (best_defense, q) in sorted(best_defense_per_state.items()):
+        state_key, attack = inner_state_key
+        stage_num, status, inventory = state_key
+        print(f"  stage={stage_num}  status={status}  attack={attack}  best_defense={best_defense}  Q={q:.4f}")
     # ==========================================================================
     # Since epsilon is not returned from train_bilevel_qlearning, we estimate it
     # Adjust these values to match your actual decay in agent.py/config.py
