@@ -70,7 +70,7 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
             print(f"Current State: {current_state}")
             print(f"{'='*60}\n")
 
-        state_key = state_to_key(current_state)
+        state_key = state_to_key(current_state, stage)
 
         # ====================================================================
         # OUTER LEVEL (ATTACKER) - PART 1
@@ -192,7 +192,7 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
             'asset_status': speculative_asset_status,
             'IM_inventory': state_after_alloc['IM_inventory']
         }
-        next_state_key = state_to_key(speculative_next_state)
+        next_state_key = state_to_key(speculative_next_state, stage + 1)
 
         # Pre-compute next-stage resources (needed in Steps 6 and 9)
         next_stages_left   = stages_left - 1

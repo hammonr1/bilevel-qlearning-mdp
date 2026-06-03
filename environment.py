@@ -1,4 +1,4 @@
-import random
+=import random
 from config import (TAM, TIM, num_stages, num_assets, asset_value,
                     SAM_positions, coverage_matrix, initial_asset_status,
                     initial_IM_inventory, gamma, epsilon_outer, epsilon_inner,
@@ -133,15 +133,19 @@ def epsilon_greedy(Q_table, state_key, feasible_actions, epsilon):
             best_action = action
     return best_action
 
-def state_to_key(state: dict):
+def state_to_key(state: dict, stage: int = None):
     """
     Convert mutable state dict to a hashable key for Q-tables.
+    Stage is included so Q-tables are naturally partitioned per stage,
+    enabling extraction of 5 separate attacker/defender matrices after training.
     """
     status = tuple(state['asset_status'])
     inventory = tuple(
         int(round(state['IM_inventory'][n])) 
         for n in sorted(state['IM_inventory'])
     )
+    if stage is not None:
+        return (stage, status, inventory)
     return (status, inventory)
 
 def calculate_saving_probability(num_AMs, num_IMs, p, p_tilde, epsilon: float = 1e-6):
