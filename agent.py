@@ -359,7 +359,14 @@ def train_bilevel_qlearning(num_episodes, verbose_every: int = 100):
 
     damage_history = []
 
+    epsilon_outer = 1.0
+    epsilon_inner = 1.0
+    epsilon_decay = 0.995
+    epsilon_min   = 0.01
+
     for episode in range(1, num_episodes + 1):
+        epsilon_outer = max(epsilon_min, epsilon_outer * epsilon_decay)
+        epsilon_inner = max(epsilon_min, epsilon_inner * epsilon_decay)
 
         verbose = (episode == 1 or episode % verbose_every == 0)
         if verbose:

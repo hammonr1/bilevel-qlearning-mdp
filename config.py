@@ -7,7 +7,7 @@ import random
 
 TAM        = 20   # Total Attacking Missiles  (TAN=20 from notes)
 TIM        = 15   # Total Intercepting Missiles (TIM=15 from notes; TIM/4 = 3.75 per stage)
-num_stages = 4    # Number of sequential salvos (T=4 from Colab)
+num_stages = 5    # Number of sequential salvos (T=4 from Colab)
 TAM_per_stage = TAM / num_stages   # 5 AMs per stage
 TIM_per_stage = TIM / num_stages   # ~3.75 IMs per stage
 
@@ -59,8 +59,11 @@ initial_state = {
 # Learning parameters — defined once here, passed into functions as arguments
 # (Q-tables are created inside train_bilevel_qlearning, not here)
 gamma         = 0.9    # Discount factor
-epsilon_outer = 0.1    # Exploration rate for attacker
-epsilon_inner = 0.1    # Exploration rate for defender
+epsilon_outer = 1.0    # Exploration rate for attacker
+epsilon_inner = 1.0    # Exploration rate for defender
+
+epsilon_decay = 0.995
+epsilon_min   = 0.01
 
 PRESET_ATTACK_STRATEGIES = [
     (0, 0),  # No attack

@@ -1,6 +1,7 @@
 import random
 import numpy as np
-from config import gamma, epsilon_outer, epsilon_inner
+import csv
+from config import gamma, epsilon_outer, epsilon_inner, num_stages
 from agent import run_one_episode, train_bilevel_qlearning
 import os
 import matplotlib.pyplot as plt
@@ -53,16 +54,34 @@ if __name__ == "__main__":
     
     # Train — all parameters are set at the top of the file
     Q_outer, Q_inner, damage_history = train_bilevel_qlearning(
-        num_episodes=10000,
-        verbose_every=1000
+        num_episodes=7500,
+        verbose_every=750
     )
     
-    # Evaluate learned policies greedily (epsilon=0)
+        # Evaluate learned policies greedily (epsilon=0)
     evaluate_policy(Q_outer, Q_inner, n_eval=200)
-    
+
     # Summary of learned Q-tables
     print(f"\nQ_outer entries: {len(Q_outer)}")
     print(f"Q_inner entries: {len(Q_inner)}")
+
+    print("Sample Q_outer keys:", list(Q_outer.keys())[:3])
+    print("Sample Q_inner keys:", list(Q_inner.keys())[:3])
+    
+    with open("outputs/optimal_policies.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["asset_status", "im_inventory", "attack", "best_defense", "q_value"])
+
+        best_per_state = {}
+        for (inner_state_key, defend_action), q in Q_inner.items():
+            if inner_state_key not in best_per_state or q > best_per_state[inner_state_key][1]:
+                best_per_state[inner_state_key] = (defend_action, q)
+
+        for inner_state_key, (best_defense, q) in best_per_state.items():
+            state, attack = inner_state_key
+            writer.writerow([state[0], state[1], attack, best_defense, f"{q:.4f}"])
+
+    print("Optimal policies saved to outputs/optimal_policies.csv")
     
     # Show top attacker strategies (highest Q → most damage)
     top_attacks = sorted(Q_outer.items(), key=lambda x: -x[1])[:5]
