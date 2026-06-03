@@ -1,4 +1,4 @@
-=import random
+import random
 from config import (TAM, TIM, num_stages, num_assets, asset_value,
                     SAM_positions, coverage_matrix, initial_asset_status,
                     initial_IM_inventory, gamma, epsilon_outer, epsilon_inner,

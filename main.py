@@ -68,9 +68,11 @@ if __name__ == "__main__":
     print("Sample Q_outer keys:", list(Q_outer.keys())[:3])
     print("Sample Q_inner keys:", list(Q_inner.keys())[:3])
     
+    # state_key is now (stage, status, inventory)
+    # inner_state_key is now (state_key, attack) = ((stage, status, inventory), attack)
     with open("outputs/optimal_policies.csv", "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["asset_status", "im_inventory", "attack", "best_defense", "q_value"])
+        writer.writerow(["stage", "asset_status", "im_inventory", "attack", "best_defense", "q_value"])
 
         best_per_state = {}
         for (inner_state_key, defend_action), q in Q_inner.items():
@@ -78,16 +80,47 @@ if __name__ == "__main__":
                 best_per_state[inner_state_key] = (defend_action, q)
 
         for inner_state_key, (best_defense, q) in best_per_state.items():
-            state, attack = inner_state_key
-            writer.writerow([state[0], state[1], attack, best_defense, f"{q:.4f}"])
+            state_key, attack = inner_state_key       # state_key = (stage, status, inventory)
+            stage_num, status, inventory = state_key
+            writer.writerow([stage_num, status, inventory, attack, best_defense, f"{q:.4f}"])
 
     print("Optimal policies saved to outputs/optimal_policies.csv")
-    
+
     # Show top attacker strategies (highest Q → most damage)
     top_attacks = sorted(Q_outer.items(), key=lambda x: -x[1])[:5]
     print("\nTop 5 attacker strategies (by Q-value):")
     for (s_key, action), q_val in top_attacks:
-        print(f"  state={s_key[0]}  attack={action}  Q={q_val:.4f}")
+        stage_num, status, inventory = s_key
+        print(f"  stage={stage_num}  status={status}  inv={inventory}  attack={action}  Q={q_val:.4f}")
+
+    # ==========================================================================
+    # PER-STAGE Q-MATRICES (5 attacker + 5 defender)
+    # ==========================================================================
+    print("\n" + "="*70)
+    print("PER-STAGE Q-MATRICES")
+    print("="*70)
+
+    with open("outputs/q_matrices_by_stage.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["level", "stage", "asset_status", "im_inventory", "attack", "defense", "q_value"])
+
+        for t in range(1, num_stages + 1):
+            print(f"\n--- STAGE {t} | ATTACKER Q-MATRIX ---")
+            stage_outer = {k: v for k, v in Q_outer.items() if k[0][0] == t}
+            for (s_key, action), q in sorted(stage_outer.items(), key=lambda x: -x[1]):
+                _, status, inventory = s_key
+                print(f"  status={status}  inv={inventory}  attack={action}  Q={q:.4f}")
+                writer.writerow(["attacker", t, status, inventory, action, "-", f"{q:.4f}"])
+
+            print(f"\n--- STAGE {t} | DEFENDER Q-MATRIX ---")
+            stage_inner = {k: v for k, v in Q_inner.items() if k[0][0][0] == t}
+            for (inner_key, defense), q in sorted(stage_inner.items(), key=lambda x: -x[1]):
+                s_key, attack = inner_key
+                _, status, inventory = s_key
+                print(f"  status={status}  inv={inventory}  attack={attack}  defense={defense}  Q={q:.4f}")
+                writer.writerow(["defender", t, status, inventory, attack, defense, f"{q:.4f}"])
+
+    print("\nPer-stage Q-matrices saved to outputs/q_matrices_by_stage.csv")
     
     # ==========================================================================
     # DIAGNOSTICS: Reconstruct epsilon decay
