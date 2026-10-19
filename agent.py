@@ -34,7 +34,8 @@ from optimization import solve_IM_allocation_model
 # MAIN TRAINING LOOP - ONE EPISODE
 # ============================================================================
 
-def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, epsilon_inner, verbose: bool = True):
+def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, epsilon_inner,
+                    verbose: bool = True, learn: bool = True):
     """
     Execute one complete episode through all stages.
     Each stage goes through all 9 steps.
@@ -45,6 +46,10 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         attacker anticipation (defender-optimal Bellman target).
       - Steps 8 and 9 reuse the same speculative transition so all three
         updates are consistent with a single stochastic draw.
+
+    learn=False runs the episode without touching the Q-tables or visit
+    counts (no Q initialisation, no N increments, Steps 6 and 9 skipped).
+    Used by greedy evaluation so it cannot overwrite learned values.
     """
 
     # Initialize episode
@@ -83,14 +88,16 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
 
         feasible_attacks = generate_attack_strategies(current_state['asset_status'], TAM_this_stage)
 
-        for a in feasible_attacks:
-            if (state_key, a) not in Q_outer:
-                Q_outer[(state_key, a)] = 0.0
-            if (state_key, a) not in N_outer:
-                N_outer[(state_key, a)] = 0
+        if learn:
+            for a in feasible_attacks:
+                if (state_key, a) not in Q_outer:
+                    Q_outer[(state_key, a)] = 0.0
+                if (state_key, a) not in N_outer:
+                    N_outer[(state_key, a)] = 0
 
         attack_action = epsilon_greedy(Q_outer, state_key, feasible_attacks, epsilon_outer)
-        N_outer[(state_key, attack_action)] += 1
+        if learn:
+            N_outer[(state_key, attack_action)] += 1
 
         if verbose:
             print(f"   Selected attack: {attack_action}")
@@ -123,14 +130,16 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
             ASSET_NODE     = ASSET_NODE
         )
 
-        for d in feasible_defends:
-            if (inner_state_key, d) not in Q_inner:
-                Q_inner[(inner_state_key, d)] = 0.0
-            if (inner_state_key, d) not in N_inner:
-                N_inner[(inner_state_key, d)] = 0
+        if learn:
+            for d in feasible_defends:
+                if (inner_state_key, d) not in Q_inner:
+                    Q_inner[(inner_state_key, d)] = 0.0
+                if (inner_state_key, d) not in N_inner:
+                    N_inner[(inner_state_key, d)] = 0
 
         defend_action = epsilon_greedy(Q_inner, inner_state_key, feasible_defends, epsilon_inner)
-        N_inner[(inner_state_key, defend_action)] += 1
+        if learn:
+            N_inner[(inner_state_key, defend_action)] += 1
 
         if verbose:
             print(f"   Selected defense: {defend_action}")
@@ -198,6 +207,8 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         next_stages_left   = stages_left - 1
         next_TAM_remaining = TAM_remaining - TAM_this_stage
         next_TAM_per_stage = next_TAM_remaining / max(next_stages_left, 1)
+        next_TIM_remaining = TIM_remaining - TIM_this_stage
+        next_TIM_per_stage = next_TIM_remaining / max(next_stages_left, 1)
 
         # Next feasible attacks (empty list signals terminal stage)
         if stage < num_stages:
@@ -216,41 +227,42 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         # --------------------------------------------------------------------
         if verbose: print("\nSTEP 6: Update inner level Q-value")
 
-        alpha_inner = 1.0 / N_inner[(inner_state_key, defend_action)]
+        if learn:
+            alpha_inner = 1.0 / N_inner[(inner_state_key, defend_action)]
 
-        if stage < num_stages and next_feasible_attacks:
-            next_inner_vals = []
-            for a in next_feasible_attacks:
-                next_inner_key = (next_state_key, a)
-                # Best defender response to this next attack
-                next_feasible_defs = generate_defend_strategies(
-                    inner_state     = speculative_asset_status,
-                    TIM_this_stage  = next_TAM_per_stage,
-                    attack_action   = a,
-                    IM_inventory    = speculative_next_state['IM_inventory'],
-                    coverage_matrix = coverage_matrix,
-                    ASSET_NODE      = ASSET_NODE
-                )
-                best_def_q = max(
-                    Q_inner.get(((next_inner_key, d)), 0.0)
-                    for d in next_feasible_defs
-                )
-                next_inner_vals.append(best_def_q)
+            if stage < num_stages and next_feasible_attacks:
+                next_inner_vals = []
+                for a in next_feasible_attacks:
+                    next_inner_key = (next_state_key, a)
+                    # Best defender response to this next attack
+                    next_feasible_defs = generate_defend_strategies(
+                        inner_state     = speculative_asset_status,
+                        TIM_this_stage  = next_TIM_per_stage,
+                        attack_action   = a,
+                        IM_inventory    = speculative_next_state['IM_inventory'],
+                        coverage_matrix = coverage_matrix,
+                        ASSET_NODE      = ASSET_NODE
+                    )
+                    best_def_q = max(
+                        Q_inner.get(((next_inner_key, d)), 0.0)
+                        for d in next_feasible_defs
+                    )
+                    next_inner_vals.append(best_def_q)
 
-            # Worst-case: attacker picks the move that minimises defender's best Q
-            worst_case_next = min(next_inner_vals)
-        else:
-            worst_case_next = 0.0   # terminal stage
+                # Worst-case: attacker picks the move that minimises defender's best Q
+                worst_case_next = min(next_inner_vals)
+            else:
+                worst_case_next = 0.0   # terminal stage
 
-        Q_inner[(inner_state_key, defend_action)] += alpha_inner * (
-            reward_inner + gamma * worst_case_next
-            - Q_inner[(inner_state_key, defend_action)]
-        )
+            Q_inner[(inner_state_key, defend_action)] += alpha_inner * (
+                reward_inner + gamma * worst_case_next
+                - Q_inner[(inner_state_key, defend_action)]
+            )
 
-        if verbose:
-            print(f"   worst_case_next={worst_case_next:.4f}")
-            print(f"   Updated Q_inner[{inner_state_key}, {defend_action}] = "
-                  f"{Q_inner[(inner_state_key, defend_action)]:.4f}")
+            if verbose:
+                print(f"   worst_case_next={worst_case_next:.4f}")
+                print(f"   Updated Q_inner[{inner_state_key}, {defend_action}] = "
+                      f"{Q_inner[(inner_state_key, defend_action)]:.4f}")
 
 
         # ====================================================================
@@ -295,23 +307,24 @@ def run_one_episode(Q_outer, Q_inner, N_outer, N_inner, gamma, epsilon_outer, ep
         # --------------------------------------------------------------------
         if verbose: print("\nSTEP 9: Update outer level Q-value using Bellman equation")
 
-        alpha_outer = 1.0 / N_outer[(state_key, attack_action)]
+        if learn:
+            alpha_outer = 1.0 / N_outer[(state_key, attack_action)]
 
-        if stage < num_stages and next_feasible_attacks:
-            max_Q_next_outer = max(
-                Q_outer.get((next_state_key, a), 0.0) for a in next_feasible_attacks
+            if stage < num_stages and next_feasible_attacks:
+                max_Q_next_outer = max(
+                    Q_outer.get((next_state_key, a), 0.0) for a in next_feasible_attacks
+                )
+            else:
+                max_Q_next_outer = 0.0   # terminal stage
+
+            Q_outer[(state_key, attack_action)] += alpha_outer * (
+                reward_outer
+                + gamma * max_Q_next_outer
+                - Q_outer[(state_key, attack_action)]
             )
-        else:
-            max_Q_next_outer = 0.0   # terminal stage
 
-        Q_outer[(state_key, attack_action)] += alpha_outer * (
-            reward_outer
-            + gamma * max_Q_next_outer
-            - Q_outer[(state_key, attack_action)]
-        )
-
-        if verbose:
-            print(f"   Q_outer updated → {Q_outer[(state_key, attack_action)]:.4f}")
+            if verbose:
+                print(f"   Q_outer updated → {Q_outer[(state_key, attack_action)]:.4f}")
 
 
         # ====================================================================

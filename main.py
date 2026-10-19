@@ -19,7 +19,8 @@ def evaluate_policy(Q_outer: dict, Q_inner: dict, n_eval: int = 100) -> float:
             gamma=gamma,
             epsilon_outer=0.0,   # pure exploitation
             epsilon_inner=0.0,
-            verbose=False
+            verbose=False,
+            learn=False          # evaluation must not modify the learned Q-tables
         )
     avg = total_damage / n_eval
     print(f"\nGREEDY EVALUATION ({n_eval} runs): avg attacker damage = {avg:.2f}")
