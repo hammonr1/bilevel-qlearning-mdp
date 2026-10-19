@@ -1,4 +1,4 @@
-from pulp import LpProblem, LpMaximize, LpVariable, lpSum, LpStatus, value
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, LpStatus, value, PULP_CBC_CMD
 from config import asset_value, coverage_matrix, ASSET_NODE
 
 def solve_IM_allocation_model(current_state, attack_action, defend_action,
