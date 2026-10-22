@@ -1,0 +1,4 @@
+# Large per-run artefacts (Q-table pickles, per-episode traces) are kept on disk but not in git.
+results/qtables/
+results/raw/
+__pycache__/
