@@ -127,3 +127,16 @@ doctrine's action.
 computed from the survival probabilities, not from the realized Bernoulli outcome. The reported
 post-engagement loss is the mean over evaluation episodes of sum_t gamma^(t-1) D_t (Eqs. 77-78),
 where D_t is evaluated along the realized trajectory. Undiscounted sums are also stored for reference.
+
+## Stage (c): robustness study
+
+**D14. Swap refinement acceptance (Algorithm 2, Step 6).** The manuscript says "if there exists a
+neighbouring allocation with lower objective, set x_inc = x'". Implemented as best-improvement: all
+144 one-battery swap neighbours are evaluated with the same 3-seed protocol and the incumbent moves
+to the neighbour with the lowest mean loss if that is strictly lower (Eq. 88); the search stops at the
+first iteration with no improving neighbour (at most 10 iterations). The Sec. 5.2 trace (one swap
+per iteration, each the best found) is consistent with this reading.
+
+**D15. Parallel execution.** Runs are independent learning problems executed in a process pool (8
+workers on 4 cores to overlap the CBC subprocess latency); each run's RNG is seeded by its own seed,
+so results do not depend on scheduling. Completed runs are cached as JSON and never recomputed.

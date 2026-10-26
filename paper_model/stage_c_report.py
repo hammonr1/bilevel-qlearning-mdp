@@ -238,8 +238,13 @@ def held(fn):
 conclusions.append(("Candidate 0 is the best uncapped allocation (paper Table 1)", held(lambda r: flags[r]["a"])))
 conclusions.append(("Candidate 3 is the best capped allocation (paper Table 2)", held(lambda r: flags[r]["b"])))
 conclusions.append(("The best allocation differs between the uncapped and capped environments (ranking flip)", held(lambda r: flags[r]["c"])))
-conclusions.append(("Both full-coverage candidates (0 and 3) outrank all partial-coverage candidates in both environments",
-                    held(lambda r: all(set(flags[r][k][:2]) == {0, 3} for k in ("rank_unc", "rank_cap")))))
+conclusions.append(("Candidates 0 and 3 (the two full-coverage plans) are the two best uncapped allocations (paper Table 1)",
+                    held(lambda r: set(flags[r]["rank_unc"][:2]) == {0, 3})))
+conclusions.append(("Candidate 4 is the capped runner-up (paper Table 2)", held(lambda r: flags[r]["rank_cap"][1] == 4)))
+def margin_ok(r):
+    rows = sorted((x for x in summary if x["rule"] == r and x["env"] == "capped"), key=lambda x: fl(x["mean_loss"]))
+    return fl(rows[1]["mean_loss"]) - fl(rows[0]["mean_loss"]) > fl(rows[0]["sd_seeds"])
+conclusions.append(("Capped best beats the runner-up by more than one seed SD (ranking statistically resolvable at 3 seeds)", held(margin_ok)))
 conclusions.append(("Loss magnitude within 5% of the paper's best-capped value 1363.04",
                     held(lambda r: abs(fl(best(r, "capped")["mean_loss"]) - 1363.04) / 1363.04 <= 0.05)))
 if ref_sum:
