@@ -44,15 +44,88 @@ learning result.
 maximise newly covered assets, ties by value-weighted uncovered coverage, then lowest index.
 Reproduces Candidate 0 without further assumptions.
 
-## Flagged for the authors before later stages run
+## Stage (b): environment and learner
 
-**D4. Over-cap actions: filter-before-selection vs. trimming. [AUTHORS: CONFIRM]**
-The manuscript text says the environment *removes the lowest-ranked selected targets / defended
-assets until the realized vector satisfies the cap* (Sec. 4.2 after Eq. 17; Sec. 4.3 after Eq. 39;
-Sec. 4.4 after Eq. 62; Sec. 5.1.2). The rebuild instructions say instead: *keep an action in the
-feasible set only if its realized vector already satisfies the cap and (for defence) can be sourced;
-filter-before-selection; no trimming.* The rebuild follows the instructions. Note that under
-filtering, Eqs. (19) and (40) are the operative definitions and the "remove lowest-ranked" sentences
-in Secs. 4.2–4.4 and 5.1.2 no longer describe the code; the manuscript text should be aligned with
-whichever mechanism is kept. Both mechanisms give the same non-binding thresholds used as the Table 3
-sanity check (LAM ≥ 16 and LIM ≥ 32).
+**D4. Over-cap actions: trimming (manuscript) vs. filter-before-selection (considered, rejected).**
+The manuscript text (Sec. 4.2 after Eq. 17; Sec. 4.3 after Eq. 39; Sec. 4.4 after Eq. 62; Sec. 5.1.2)
+says the environment *removes the lowest-ranked selected targets / defended assets until the
+realized vector satisfies the cap and sourcing constraints*. Filter-before-selection (drop the
+class-level action from the feasible set instead) was considered because the author's first rebuild
+brief asked for it, and was **rejected** by the author on review of stage (a): the manuscript's
+trimming mechanism is authoritative. Implemented:
+- every class-level action in {0,1,2}^2 is selectable in every state, so A^A(s) and A^D(s) are
+  always the full 9-action grids (Eqs. 19 and 40 are then satisfied by construction);
+- the environment realizes the action and trims: attacker removes the selected target with the
+  smallest R_it (Eq. 13) until sum_i y_it <= Lambda^A_t (Eq. 17-18); defender removes the defended
+  asset with the smallest H_it (Eq. 30) until sum_i u_it <= Lambda^D_t and the sourcing system
+  (34)-(37) is feasible (Eqs. 38-40);
+- a defense trimmed to zero IMs is identical to the no-defense action (its Q-entry is still keyed
+  by the class-level action that was chosen, as the manuscript's Q^D(s^D, d_t) requires).
+
+**D5. "Lowest-ranked" is taken across both importance classes**, i.e. by the raw score R_it
+(attacker) or H_it (defender), not class-by-class. Because high-importance scores dominate
+(v_i p_i ~ 70-110 vs. 11-48), low-importance targets are trimmed first in practice. Ties (measure
+zero) go to the higher asset index.
+
+**D6. Trimming removes a whole selected target** (all eta AMs or all rho*y IMs assigned to it),
+never a fraction of them, since the manuscript trims *targets/assets*, not missiles. Leftover
+capacity after a removal is not redistributed.
+
+**D7. Sourcing feasibility during trimming is checked exactly with a max-flow test** on the
+bipartite SAM-to-asset network (supplies q_jt, demands u_it, arcs where c_ji = 1), which is
+equivalent to the existence of an integer w satisfying (34)-(37) by total unimodularity; the total
+cap (39) is checked separately. The realized w* is then obtained from the PuLP integer program
+(58)-(62) with **no kappa cost term** (zero objective, any feasible solution), as instructed.
+**[AUTHORS: CONFIRM]** With a zero objective the particular feasible w* (hence which SAM site is
+depleted, and hence SAM-vulnerability effects) is left to the solver and is deterministic but
+arbitrary. Eq. (57)'s kappa_ji (e.g. kappa = distance) would make this choice principled; the
+manuscript gives no kappa value.
+
+**D8. Sourcing solver.** PuLP 2.9.0 with the bundled CBC (`PULP_CBC_CMD`), fixed for all reported
+runs and recorded in the results metadata (`sourcing_solver`). Stage (b) benchmark on Candidate 3:
+CBC 5.2 ms and HiGHS 1.5 ms per sourcing solve; a full 1,000-train/500-eval run takes about 5 s with
+CBC (the (q, u) -> w* cache leaves only ~500 distinct solves per run), so speed did not force the
+choice. Because the zero-objective solution is solver-dependent (D7), switching backends changes the
+realized SAM depletion and therefore the numbers (stage (b) single-seed check: capped 952 vs 970,
+uncapped 1000 vs 895 for CBC vs HiGHS).
+
+**D9. Q-table keys.** The allocation vector x is constant within a learning run and is therefore not
+stored inside each key; attacker key = (z as a 30-bit mask, m_t, q_t restricted to the allocated SAM
+sites in ascending site order, t); defender key = (attacker key, a_t). Unique-state counts for
+Table 7 are counts of these keys.
+
+**D10. Exploration schedule and arg-max tie-break. [AUTHORS: CONFIRM — large effect]**
+eps_k = 0.60 - (0.60 - 0.02) (k-1)/(N_train-1) for training episode k (linear, same for both
+agents); eps = 0 in evaluation. The manuscript does not say how arg-max ties are broken. This matters
+because the greedy evaluation trajectory visits attacker states that were never visited in training
+in roughly 40-60 % of evaluation salvos (1,000 training episodes visit ~5,500 of the reachable
+states; Bernoulli outcomes in evaluation keep producing new (z, m, q) combinations). In such a state
+every Q-entry is 0 and the "arg-max" is entirely the tie-break. Four rules were compared on
+Candidate 3, 1,000/500 episodes, seeds 7/17/27 (paper: capped 1363.04, uncapped 1363.67):
+
+| tie-break (unseen state -> action)            | capped mean (SD) | uncapped mean (SD) |
+|-----------------------------------------------|------------------|--------------------|
+| `first`: lexicographic, -> (0,0) = no attack / no defence | 884.7 (102.9) | 860.6 (160.3) |
+| `random`: uniform over tied actions            | 1237.1 (17.6)    | 1263.8 (30.6)      |
+| `last`: reverse lexicographic, -> (2,2)        | 1388.2 (22.7)    | 1403.4 (11.8)      |
+| `aggressive`: most missiles first, -> (2,2)    | 1388.2 (22.7)    | 1403.4 (11.8)      |
+
+`last` and `aggressive` coincide here because (2,2) heads both orders. Only the (2,2)-default rules
+reproduce the manuscript's loss magnitude (within 2-3 %); `first` makes both agents passive in
+unseen states and understates loss by ~35 %. The code default is `first` (plain lexicographic
+arg-max) until the authors confirm; stage (c) will not run until the rule is fixed. Whatever rule is
+chosen applies identically to the attacker and the defender and to training and evaluation.
+
+**D11. Randomness.** One `random.Random(seed)` stream per learning run drives both agents'
+eps-greedy draws and the Bernoulli survival draws (Eq. 63), in the order they occur in Algorithm 1;
+evaluation episodes continue the same stream.
+
+**D12. Defender continuation value (Eq. 72).** pi^A(a|s^A_{t+1}) is the attacker's *current*
+eps-greedy policy: eps/9 on every action plus (1-eps) on arg-max_a Q^A(s^A_{t+1}, a); unseen
+Q-entries read as 0. Under a fixed (non-learning) attacker doctrine the policy puts mass 1 on the
+doctrine's action.
+
+**D13. Rewards and loss.** r^A_t = D_t (Eq. 53, expected damage) and r^D_t = S_t (Eq. 54), both
+computed from the survival probabilities, not from the realized Bernoulli outcome. The reported
+post-engagement loss is the mean over evaluation episodes of sum_t gamma^(t-1) D_t (Eqs. 77-78),
+where D_t is evaluated along the realized trajectory. Undiscounted sums are also stored for reference.
