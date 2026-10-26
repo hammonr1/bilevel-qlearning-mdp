@@ -160,7 +160,7 @@ for rule in RULES:
 # ---- 2
 P("## 2. Swap-neighbourhood refinement (Algorithm 2) under each rule\n")
 P("Start = that rule's capped best. Each iteration evaluates all 144 one-battery swap neighbours with the same "
-  "3-seed protocol and moves to the best neighbour if its mean loss is strictly lower (best-improvement, DECISIONS D15); "
+  "3-seed protocol and moves to the best neighbour if its mean loss is strictly lower (best-improvement, DECISIONS D14); "
   "it stops when no neighbour improves. Paper (Sec. 5.2): Candidate 3 → swap 21→12 (1363.04 → 1320.85) → swap 24→3 "
   "(→ 1318.71) → final {3, 7, 12, 18, 19, 23}, 28 assets covered, 3.25% reduction.\n")
 if ref_sum:
