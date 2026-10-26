@@ -40,6 +40,26 @@ def pct(x):
     return f"{100 * fl(x):.1f}%"
 
 
+# ------------------------------------------------------------------------------------- per-seed refinement CSV
+# (raw/ is git-ignored; this keeps every refinement run's per-seed result in the committed outputs)
+import json
+RAW = OUT.parent / "raw"
+_ref_runs = sorted(RAW.glob("refine__*.json"))
+if _ref_runs:
+    with open(OUT / "refinement_per_seed.csv", "w", newline="") as f:
+        w = None
+        for p in _ref_runs:
+            r = json.load(open(p))
+            row = dict(rule=r["rule"], env=r["env"], sites="-".join(map(str, r["sites"])), covered=r["covered"],
+                       seed=r["seed"], n_train=r["n_train"], loss=r["loss"], undiscounted=r["undiscounted"],
+                       realized=r["realized"], unvisited_A_salvo_frac=r["unvisited_A_salvo_frac"],
+                       unvisited_D_salvo_frac=r["unvisited_D_salvo_frac"], unvisited_A_episode_frac=r["unvisited_A_episode_frac"],
+                       unvisited_D_episode_frac=r["unvisited_D_episode_frac"], QA_entries=r["QA_entries"], QD_entries=r["QD_entries"])
+            if w is None:
+                w = csv.DictWriter(f, fieldnames=list(row))
+                w.writeheader()
+            w.writerow(row)
+
 # ------------------------------------------------------------------------------------- load
 summary = read("tables_1_2_summary.csv")
 per_seed = read("tables_1_2_per_seed.csv")
@@ -84,13 +104,13 @@ if trainlen:
     ax1.set_ylabel("discounted expected damage", color=MUTED, fontsize=9)
     for series, col, key in (("attacker state", BLUE, "unvisited_A_salvo_frac"), ("defender state", ORANGE, "unvisited_D_salvo_frac")):
         ys = [100 * fl(r[key]) for r in trainlen]
-        ax2.plot(xs, ys, color=col, linewidth=2, marker="o", markersize=7, label=series)
-        ax2.annotate(series, (xs[-1], ys[-1]), xytext=(6, 0), textcoords="offset points", color=INK, fontsize=9, va="center")
+        ax2.plot(xs, ys, color=col, linewidth=2, marker="o", markersize=7, label=series,
+                 markeredgecolor="#fcfcfb", markeredgewidth=1.5)   # surface ring: the two series overlap
     ax2.set_ylim(0, 100)
     ax2.set_title("Evaluation salvos in states never visited in training", loc="left", fontsize=10, color=INK)
     ax2.set_ylabel("% of evaluation salvos", color=MUTED, fontsize=9)
     ax2.legend(frameon=False, fontsize=9, loc="upper right")
-    ax2.set_xlim(xs[0] * 0.8, xs[-1] * 1.9)
+    ax2.set_xlim(xs[0] * 0.8, xs[-1] * 1.25)
     fig.suptitle("Candidate 3, capped (LAM=10, LIM=12), aggressive tie-break", x=0.01, ha="left", fontsize=11, color=INK)
     fig.tight_layout()
     fig_path = OUT / "training_length.png"
