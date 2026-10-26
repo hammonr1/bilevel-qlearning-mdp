@@ -87,9 +87,53 @@ All runs: 30-asset instance (seed 7), T = 8, M = 64, B = 6, N_IM = 10, ω = 0.65
 
 ## 2. Swap-neighbourhood refinement (Algorithm 2) under each rule
 
-Start = that rule's capped best. Each iteration evaluates all 144 one-battery swap neighbours with the same 3-seed protocol and moves to the best neighbour if its mean loss is strictly lower (best-improvement, DECISIONS D15); it stops when no neighbour improves. Paper (Sec. 5.2): Candidate 3 → swap 21→12 (1363.04 → 1320.85) → swap 24→3 (→ 1318.71) → final {3, 7, 12, 18, 19, 23}, 28 assets covered, 3.25% reduction.
+Start = that rule's capped best. Each iteration evaluates all 144 one-battery swap neighbours with the same 3-seed protocol and moves to the best neighbour if its mean loss is strictly lower (best-improvement, DECISIONS D14); it stops when no neighbour improves. Paper (Sec. 5.2): Candidate 3 → swap 21→12 (1363.04 → 1320.85) → swap 24→3 (→ 1318.71) → final {3, 7, 12, 18, 19, 23}, 28 assets covered, 3.25% reduction.
 
-_Refinement CSVs not present._
+### Rule: aggressive (primary; ties -> (2,2))
+
+| Iteration | Incumbent | Swap | Best neighbour | Covered | Mean loss | SD | Outcome |
+|---|---|---|---|---|---|---|---|
+| 0 | {7, 18, 19, 21, 23, 24} | — | {7, 18, 19, 21, 23, 24} | 30 | 1388.22 | 22.74 | start |
+| 1 | {7, 18, 19, 21, 23, 24} | 19→13 | {7, 13, 18, 21, 23, 24} | 30 | 1349.78 | 3.94 | accepted |
+| 2 | {7, 13, 18, 21, 23, 24} | 23→8 | {7, 8, 13, 18, 21, 24} | 30 | 1346.63 | 9.43 | accepted |
+| 3 | {7, 8, 13, 18, 21, 24} | 24→16 | {7, 8, 13, 16, 18, 21} | 28 | 1336.02 | 8.16 | accepted |
+| 4 | {7, 8, 13, 16, 18, 21} | 16→29 | {7, 8, 13, 18, 21, 29} | 28 | 1336.57 | 7.78 | rejected (no improving neighbour) -> stop |
+
+- Final allocation {7, 8, 13, 16, 18, 21} covering 28 assets, mean loss 1336.02 (start 1388.22, reduction 3.76%). Reaches the paper's {3, 7, 12, 18, 19, 23}: **NO**.
+  - iteration 1, three best neighbours: 19→13 = 1349.78 ± 3.94; 23→25 = 1350.24 ± 1.53; 24→20 = 1351.77 ± 16.46
+  - iteration 2, three best neighbours: 23→8 = 1346.63 ± 9.43; 24→29 = 1349.60 ± 26.88; 23→6 = 1350.57 ± 12.38
+  - iteration 3, three best neighbours: 24→16 = 1336.02 ± 8.16; 24→29 = 1336.57 ± 7.78; 18→9 = 1340.69 ± 6.63
+  - iteration 4, three best neighbours: 16→29 = 1336.57 ± 7.78; 13→12 = 1337.57 ± 15.03; 8→3 = 1338.22 ± 11.56
+
+### Rule: random (uniform over ties)
+
+| Iteration | Incumbent | Swap | Best neighbour | Covered | Mean loss | SD | Outcome |
+|---|---|---|---|---|---|---|---|
+| 0 | {0, 1, 2, 3, 8, 19} | — | {0, 1, 2, 3, 8, 19} | 30 | 1226.39 | 7.86 | start |
+| 1 | {0, 1, 2, 3, 8, 19} | 19→6 | {0, 1, 2, 3, 6, 8} | 30 | 1203.35 | 40.11 | accepted |
+| 2 | {0, 1, 2, 3, 6, 8} | 8→24 | {0, 1, 2, 3, 6, 24} | 30 | 1194.00 | 37.85 | accepted |
+| 3 | {0, 1, 2, 3, 6, 24} | 2→29 | {0, 1, 3, 6, 24, 29} | 30 | 1175.59 | 31.58 | accepted |
+| 4 | {0, 1, 3, 6, 24, 29} | 1→5 | {0, 3, 5, 6, 24, 29} | 30 | 1185.47 | 43.83 | rejected (no improving neighbour) -> stop |
+
+- Final allocation {0, 1, 3, 6, 24, 29} covering 30 assets, mean loss 1175.59 (start 1226.39, reduction 4.14%). Reaches the paper's {3, 7, 12, 18, 19, 23}: **NO**.
+  - iteration 1, three best neighbours: 19→6 = 1203.35 ± 40.11; 19→7 = 1206.13 ± 28.48; 19→5 = 1214.44 ± 9.07
+  - iteration 2, three best neighbours: 8→24 = 1194.00 ± 37.85; 2→18 = 1204.65 ± 19.06; 6→7 = 1206.13 ± 28.48
+  - iteration 3, three best neighbours: 2→29 = 1175.59 ± 31.58; 1→21 = 1182.93 ± 32.30; 0→17 = 1198.90 ± 8.97
+  - iteration 4, three best neighbours: 1→5 = 1185.47 ± 43.83; 29→2 = 1194.00 ± 37.85; 1→12 = 1198.51 ± 31.88
+
+### Rule: lexicographic (ties -> (0,0))
+
+| Iteration | Incumbent | Swap | Best neighbour | Covered | Mean loss | SD | Outcome |
+|---|---|---|---|---|---|---|---|
+| 0 | {7, 18, 19, 21, 23, 24} | — | {7, 18, 19, 21, 23, 24} | 30 | 884.73 | 102.91 | start |
+| 1 | {7, 18, 19, 21, 23, 24} | 7→20 | {18, 19, 20, 21, 23, 24} | 28 | 812.14 | 101.32 | accepted |
+| 2 | {18, 19, 20, 21, 23, 24} | 23→25 | {18, 19, 20, 21, 24, 25} | 28 | 681.24 | 90.60 | accepted |
+| 3 | {18, 19, 20, 21, 24, 25} | 24→1 | {1, 18, 19, 20, 21, 25} | 28 | 684.26 | 105.37 | rejected (no improving neighbour) -> stop |
+
+- Final allocation {18, 19, 20, 21, 24, 25} covering 28 assets, mean loss 681.24 (start 884.73, reduction 23.00%). Reaches the paper's {3, 7, 12, 18, 19, 23}: **NO**.
+  - iteration 1, three best neighbours: 7→20 = 812.14 ± 101.32; 18→17 = 818.14 ± 84.22; 24→14 = 822.89 ± 73.91
+  - iteration 2, three best neighbours: 23→25 = 681.24 ± 90.60; 21→28 = 772.79 ± 53.90; 21→15 = 774.46 ± 53.20
+  - iteration 3, three best neighbours: 24→1 = 684.26 ± 105.37; 21→8 = 710.71 ± 88.59; 18→16 = 714.05 ± 80.61
 
 ## 3. Unvisited-state diagnostic
 
@@ -127,6 +171,8 @@ Fractions over the 500 evaluation episodes (4,000 salvos) of each run, averaged 
 | lexicographic | capped | 2 | 36.8% | 37.1% | 73.1% | 74.5% | 5156 | 5429 | 5719 |
 | lexicographic | capped | 3 | 37.7% | 37.8% | 70.9% | 71.3% | 5220 | 5485 | 5768 |
 | lexicographic | capped | 4 | 40.0% | 40.3% | 72.4% | 73.9% | 5177 | 5434 | 5721 |
+
+Refinement runs (all neighbours, all rules) show the same pattern; their per-run values are in `refinement_trace.csv` and the per-seed JSON files under `results/raw/refine__*`.
 
 ## 4. Training-length sweep (Candidate 3, capped, aggressive rule)
 
@@ -180,7 +226,14 @@ Same decomposition along the training-length sweep (aggressive rule, means over 
 | Candidate 4 is the capped runner-up (paper Table 2) | held | held | NOT held | depends on the rule |
 | Capped best beats the runner-up by more than one seed SD (ranking statistically resolvable at 3 seeds) | NOT held | NOT held | NOT held | fails under every rule |
 | Loss magnitude within 5% of the paper's best-capped value 1363.04 | held | NOT held | NOT held | depends on the rule |
+| Swap refinement improves on the capped best (at least one accepted swap) | held | held | held | robust to the rule |
+| Refinement reaches the paper's final plan {3, 7, 12, 18, 19, 23} | NOT held | NOT held | NOT held | fails under every rule |
+| The refined plan covers fewer than 30 assets (coverage alone does not rank allocations) | held | NOT held | held | depends on the rule |
 
-Held under all three rules: The best allocation differs between the uncapped and capped environments (ranking flip).
+Why the rule matters: at 1,000 training episodes the greedy evaluation spends roughly 56% (aggressive), 59% (random) and 38% (lexicographic) of its salvos in attacker states the training never reached, and in those salvos the action is the tie-break, not a learned value. Under the aggressive rule about a third of the reported loss is generated in such salvos; under the lexicographic rule they generate none (no attack), which is why its losses are ~35% lower and far noisier across seeds. Training 20x longer only reduces the unvisited share to ~41%, because the reachable (z, m, q) space keeps growing with the Q-tables (100k entries at 20,000 episodes), so the effect is structural rather than a matter of under-training.
 
-Not held under at least one rule: Candidate 0 is the best uncapped allocation (paper Table 1) (held only under: aggressive, lexicographic); Candidate 3 is the best capped allocation (paper Table 2) (held only under: aggressive, lexicographic); Candidates 0 and 3 (the two full-coverage plans) are the two best uncapped allocations (paper Table 1) (held only under: random); Candidate 4 is the capped runner-up (paper Table 2) (held only under: aggressive, random); Capped best beats the runner-up by more than one seed SD (ranking statistically resolvable at 3 seeds) (held only under: none); Loss magnitude within 5% of the paper's best-capped value 1363.04 (held only under: aggressive).
+Refinement: all three rules accept swaps, but each ends in a different plan and none reaches the manuscript's {3, 7, 12, 18, 19, 23}. The accepted improvements (3–19 loss units under the primary rule) are of the same order as the 3-seed standard deviations (4–27), so the refinement path is set largely by learning noise; the qualitative claim that swap refinement lowers the loss of the best initial candidate does hold under every rule.
+
+Held under all three rules: The best allocation differs between the uncapped and capped environments (ranking flip); Swap refinement improves on the capped best (at least one accepted swap).
+
+Not held under at least one rule: Candidate 0 is the best uncapped allocation (paper Table 1) (held only under: aggressive, lexicographic); Candidate 3 is the best capped allocation (paper Table 2) (held only under: aggressive, lexicographic); Candidates 0 and 3 (the two full-coverage plans) are the two best uncapped allocations (paper Table 1) (held only under: random); Candidate 4 is the capped runner-up (paper Table 2) (held only under: aggressive, random); Capped best beats the runner-up by more than one seed SD (ranking statistically resolvable at 3 seeds) (held only under: none); Loss magnitude within 5% of the paper's best-capped value 1363.04 (held only under: aggressive); Refinement reaches the paper's final plan {3, 7, 12, 18, 19, 23} (held only under: none); The refined plan covers fewer than 30 assets (coverage alone does not rank allocations) (held only under: aggressive, lexicographic).

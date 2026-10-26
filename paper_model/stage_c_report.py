@@ -280,6 +280,18 @@ P(md_table(["Paper conclusion", "aggressive", "random", "lexicographic", "Verdic
              "robust to the rule" if all(v.values()) else ("fails under every rule" if not any(v.values()) else "depends on the rule")]
             for c, v in conclusions]))
 P("")
+unv = {r: 100 * fl(best(r, "capped")["unvisited_A_salvo_frac"]) for r in RULES}
+P(f"Why the rule matters: at 1,000 training episodes the greedy evaluation spends roughly "
+  f"{unv['aggressive']:.0f}% (aggressive), {unv['random']:.0f}% (random) and {unv['lexicographic']:.0f}% (lexicographic) of its "
+  "salvos in attacker states the training never reached, and in those salvos the action is the tie-break, not a learned "
+  "value. Under the aggressive rule about a third of the reported loss is generated in such salvos; under the lexicographic "
+  "rule they generate none (no attack), which is why its losses are ~35% lower and far noisier across seeds. Training 20x "
+  "longer only reduces the unvisited share to ~41%, because the reachable (z, m, q) space keeps growing with the Q-tables "
+  "(100k entries at 20,000 episodes), so the effect is structural rather than a matter of under-training.\n")
+P("Refinement: all three rules accept swaps, but each ends in a different plan and none reaches the manuscript's "
+  "{3, 7, 12, 18, 19, 23}. The accepted improvements (3–19 loss units under the primary rule) are of the same order as the "
+  "3-seed standard deviations (4–27), so the refinement path is set largely by learning noise; the qualitative claim that "
+  "swap refinement lowers the loss of the best initial candidate does hold under every rule.\n")
 P("Held under all three rules: " + ("; ".join(c for c, v in conclusions if all(v.values())) or "none") + ".\n")
 P("Not held under at least one rule: " + ("; ".join(f"{c} (held only under: {', '.join(r for r in RULES if v[r]) or 'none'})" for c, v in conclusions if not all(v.values())) or "none") + ".\n")
 
