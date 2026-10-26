@@ -94,27 +94,25 @@ stored inside each key; attacker key = (z as a 30-bit mask, m_t, q_t restricted 
 sites in ascending site order, t); defender key = (attacker key, a_t). Unique-state counts for
 Table 7 are counts of these keys.
 
-**D10. Exploration schedule and arg-max tie-break. [AUTHORS: CONFIRM — large effect]**
+**D10. Exploration schedule and arg-max tie-break.**
 eps_k = 0.60 - (0.60 - 0.02) (k-1)/(N_train-1) for training episode k (linear, same for both
-agents); eps = 0 in evaluation. The manuscript does not say how arg-max ties are broken. This matters
-because the greedy evaluation trajectory visits attacker states that were never visited in training
-in roughly 40-60 % of evaluation salvos (1,000 training episodes visit ~5,500 of the reachable
-states; Bernoulli outcomes in evaluation keep producing new (z, m, q) combinations). In such a state
-every Q-entry is 0 and the "arg-max" is entirely the tie-break. Four rules were compared on
-Candidate 3, 1,000/500 episodes, seeds 7/17/27 (paper: capped 1363.04, uncapped 1363.67):
+agents, stretched to whatever N_train a run uses); eps = 0 in evaluation. The manuscript does not
+say how arg-max ties are broken, and this matters: the greedy evaluation trajectory visits states
+that were never visited in training in a large share of salvos (Bernoulli outcomes keep producing
+new (z, m, q) combinations), and in such a state every Q-entry is 0, so the "arg-max" is entirely
+the tie-break rule.
 
-| tie-break (unseen state -> action)            | capped mean (SD) | uncapped mean (SD) |
-|-----------------------------------------------|------------------|--------------------|
-| `first`: lexicographic, -> (0,0) = no attack / no defence | 884.7 (102.9) | 860.6 (160.3) |
-| `random`: uniform over tied actions            | 1237.1 (17.6)    | 1263.8 (30.6)      |
-| `last`: reverse lexicographic, -> (2,2)        | 1388.2 (22.7)    | 1403.4 (11.8)      |
-| `aggressive`: most missiles first, -> (2,2)    | 1388.2 (22.7)    | 1403.4 (11.8)      |
-
-`last` and `aggressive` coincide here because (2,2) heads both orders. Only the (2,2)-default rules
-reproduce the manuscript's loss magnitude (within 2-3 %); `first` makes both agents passive in
-unseen states and understates loss by ~35 %. The code default is `first` (plain lexicographic
-arg-max) until the authors confirm; stage (c) will not run until the rule is fixed. Whatever rule is
-chosen applies identically to the attacker and the defender and to training and evaluation.
+**Primary rule (author decision): `aggressive`** — ties go to the most aggressive action, ordered by
+total intensity then high-importance intensity, so (2,2) first, applied identically to the attacker
+and the defender, in training and in evaluation. Rationale: consistency with the conservative
+high-information adversary assumption of Section 3.2 — an attacker that has not learned a state
+should be assumed to press the attack, not to stand down, so that the defender's resilience is not
+overstated; the same rule for the defender means an unlearned defender response is maximal defence,
+which is the symmetric conservative default for the operational layer. The rule is *not* chosen to
+match the manuscript's numbers. Two alternatives are carried through stage (c) as a robustness
+study: `random` (uniform over the tied actions, using the run's RNG) and `lexicographic` (first
+action in (0,0), (0,1), ... order, i.e. no attack / no defence). Their effect is reported in
+`results/stage_c/REPORT.md`.
 
 **D11. Randomness.** One `random.Random(seed)` stream per learning run drives both agents'
 eps-greedy draws and the Bernoulli survival draws (Eq. 63), in the order they occur in Algorithm 1;

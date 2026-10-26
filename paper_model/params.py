@@ -35,8 +35,8 @@ class Params:
     alpha_D: float = 0.10
     eps0: float = 0.60
     eps_min: float = 0.02
-    # arg-max tie-break when several actions share the maximal Q (incl. unseen states): see DECISIONS D10
-    tie_break: str = "first"        # "first" | "last" | "random" | "aggressive"
+    # arg-max tie-break when several actions share the maximal Q (incl. unvisited states): DECISIONS D10
+    tie_break: str = "aggressive"   # "aggressive" (primary) | "random" | "lexicographic"
 
     @property
     def capped(self) -> bool:
